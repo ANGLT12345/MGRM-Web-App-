@@ -70,7 +70,7 @@ domReady(function () {
         };
 
         try {
-            const response = await fetch('https://mgrm-web-app.vercel.app/api/add-points', {
+            const response = await fetch('/api/add-points', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
