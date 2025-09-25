@@ -1,22 +1,25 @@
-// server.js
+// server.js (Firebase Version)
+
 const express = require('express');
-const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const Customer = require('./Customer');
+const admin = require('firebase-admin');
 
+// --- Initialize Firebase Admin SDK ---
+// Make sure the 'serviceAccountKey.json' file is in the same directory
+const serviceAccount = require('./serviceAccountKey.json');
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const db = admin.firestore();
 const app = express();
 const PORT = 3000;
 
 // --- Middleware ---
 app.use(cors());
 app.use(bodyParser.json());
-
-// --- Database Connection ---
-// Replace with your MongoDB connection string (e.g., from MongoDB Atlas)
-mongoose.connect('YOUR_MONGODB_CONNECTION_STRING')
-  .then(() => console.log('MongoDB connected successfully.'))
-  .catch(err => console.error(err));
 
 // --- API Endpoint to Add Points ---
 app.post('/api/add-points', async (req, res) => {
@@ -26,30 +29,43 @@ app.post('/api/add-points', async (req, res) => {
     return res.status(400).json({ message: 'Customer ID and points are required.' });
   }
 
-  try {
-    // Find the customer and add points in one atomic operation
-    const updatedCustomer = await Customer.findOneAndUpdate(
-      { customerId: customerId },
-      { $inc: { points: pointsToAdd } },
-      { new: true, upsert: false } // 'new: true' returns the updated doc
-    );
+  // Get a reference to the customer's document in Firestore
+  const customerRef = db.collection('customers').doc(customerId);
 
-    if (!updatedCustomer) {
+  try {
+    const doc = await customerRef.get();
+
+    if (!doc.exists) {
       return res.status(404).json({ message: 'Customer not found.' });
     }
 
+    const customerData = doc.data();
+    const previousPoints = customerData.points;
+
+    // Use Firebase's special FieldValue to atomically increment the points
+    await customerRef.update({
+      points: admin.firestore.FieldValue.increment(pointsToAdd)
+    });
+
+    // Get the updated data to send back
+    const updatedDoc = await customerRef.get();
+    const updatedData = updatedDoc.data();
+
     res.json({
       message: 'Points added successfully!',
-      customerName: updatedCustomer.name,
-      newPoints: updatedCustomer.points
+      customerName: updatedData.name,
+      previousPoints: previousPoints,
+      pointsAdded: pointsToAdd,
+      newPoints: updatedData.points
     });
 
   } catch (error) {
+    console.error("Firebase error:", error);
     res.status(500).json({ message: 'Server error.', error: error.message });
   }
 });
 
 // --- Start the Server ---
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Firebase server is running on http://localhost:${PORT}`);
 });
