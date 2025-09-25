@@ -4,10 +4,14 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const admin = require('firebase-admin');
+const admin = require('firebase-admin');
 
 // --- Initialize Firebase Admin SDK ---
-// Make sure the 'serviceAccountKey.json' file is in the same directory
-const serviceAccount = require('./serviceAccountKey.json');
+const serviceAccountString = process.env.FIREBASE_CREDENTIALS;
+if (!serviceAccountString) {
+  throw new Error('The FIREBASE_CREDENTIALS environment variable is not set!');
+}
+const serviceAccount = JSON.parse(serviceAccountString);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
